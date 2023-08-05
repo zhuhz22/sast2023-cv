@@ -7,10 +7,10 @@ from diffusers.models import AutoencoderKL
 from .DenoisingDiffusionProcess import *
 
 # TODO begin: Inherit the AutoEncoder class from nn.Module
-class AutoEncoder(object):
+class AutoEncoder(nn.Module):
 # TODO end
     def __init__(self,
-                 model_type= "stabilityai/sd-vae-ft-ema"
+                 model_type= "C:\\Users\\admin\\.cache\\huggingface\\hub\\models--stabilityai--sd-vae-ft-ema"
                 ):
         """
             A wrapper for an AutoEncoder model
@@ -50,18 +50,17 @@ class LatentDiffusion(pl.LightningModule):
         
         super().__init__()
         self.lr = lr
+
         # TODO question: What's buffer?
+        # 不需要被optimizer更新的参数        
         self.register_buffer('latent_scale_factor', torch.tensor(latent_scale_factor))
         self.batch_size=batch_size
         
         self.vae = AutoEncoder(vae_model_type)
-        # TODO question: What do these two lines of code do? 
         for p in self.vae.parameters():
             p.requires_grad = False
-            
         with torch.no_grad():
             self.latent_dim = self.vae.encode(torch.ones(1,3,256,256)).shape[1]
-            
         # TODO begin: Complete the DenoisingDiffusionProcess p_loss function
         # Challenge: Can you figure out the forward and reverse process defined in DenoisingDiffusionProcess?
         self.model = DenoisingDiffusionProcess(generated_channels=self.latent_dim,
@@ -71,17 +70,18 @@ class LatentDiffusion(pl.LightningModule):
     @torch.no_grad()
     def forward(self,*args,**kwargs):
         # TODO question: What's *args,**kwargs?
+        # 可变参数，前者是元组类型，后者是字典类型
         return self.output_T(self.vae.decode(self.model(*args,**kwargs) / self.latent_scale_factor))
     
     def input_T(self, input):
         # TODO begin: Transform the input samples in [0, 1] range to [-1, 1]
         # Challenge: Why should we make this transform?
-        return input
+        return (2*input-1)
         # TODO end
     
     def output_T(self, input):
         # TODO begin: Transform the output samples in [-1, 1] range to [0, 1]
-        return input
+        return (input+1)/2
         # TODO end
     
     def training_step(self, batch, batch_idx):   
@@ -103,7 +103,10 @@ class LatentDiffusion(pl.LightningModule):
         return loss
     
     def configure_optimizers(self):
-        # TODO begin: Define the AdamW optimizer here (10 p.t.s)
+        # TODO begin: Define the AdamW optimizer here
         # Hint: model.parameters(), requires_grad, lr
-        return # torch.optim.AdamW(...)
+        def WhetherGrad(p):
+            return p.requires_grad
+        Filter=filter(WhetherGrad, self.model.parameters())
+        return torch.optim.AdamW(params=list(Filter), lr=self.lr)
         # TODO end

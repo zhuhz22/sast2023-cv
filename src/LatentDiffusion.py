@@ -57,6 +57,8 @@ class LatentDiffusion(pl.LightningModule):
         self.batch_size=batch_size
         
         self.vae = AutoEncoder(vae_model_type)
+        #TODO question: What do these two lines of code do?
+        #ans:中断反向传播，不监视梯度
         for p in self.vae.parameters():
             p.requires_grad = False
         with torch.no_grad():
